@@ -21,4 +21,4 @@ if __name__ == "__main__":
     print("🚀 Starting FastAPI Auth Tutorial...")
     print("📍 Health endpoint: http://localhost:8000/health")
     print("📖 Docs: http://localhost:8000/docs")
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
