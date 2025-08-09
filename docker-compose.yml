@@ -1,0 +1,78 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:13
+    container_name: fastapi-postgres
+    environment:
+      POSTGRES_DB: auth_tutorial
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U username -d auth_tutorial"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - auth-network
+
+  # FastAPI Application
+  fastapi-app:
+    build: .
+    container_name: fastapi-auth-app
+    environment:
+      DATABASE_URL: postgresql://username:password@postgres:5432/auth_tutorial
+      SECRET_KEY: your-super-secret-key-change-in-production
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app  # For development - remove in production
+    networks:
+      - auth-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kong Gateway
+  kong:
+    image: kong:3.7
+    container_name: kong-gateway
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_PROXY_LISTEN: 0.0.0.0:8080
+    ports:
+      - "8080:8080"  # Kong proxy (our main entry point)
+      - "8001:8001"  # Kong admin API
+    volumes:
+      - ./kong.yml:/kong/kong.yml:ro
+    depends_on:
+      fastapi-app:
+        condition: service_healthy
+    networks:
+      - auth-network
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+
+networks:
+  auth-network:
+    driver: bridge
